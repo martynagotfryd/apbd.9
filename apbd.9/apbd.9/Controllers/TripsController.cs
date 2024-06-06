@@ -99,25 +99,26 @@ public class TripsController : ControllerBase
         
         return Ok();
     }
-    
+
     [HttpDelete("{idClient}")]
     public async Task<IActionResult> DeleteClientWithId(int idClient)
     {
         var client = await _context.Clients.SingleOrDefaultAsync(e => e.IdClient == idClient);
+
         if (client == null)
         {
-            return NotFound($"Client with id - {idClient} doesnt exist");
+            return NotFound("Client with the given ID does not exist.");
         }
-        else if (client.ClientTrips.Count == 0)
+
+        if (client.ClientTrips.Any())
         {
-            return BadRequest("Client has assigned trips");
+            return BadRequest("Client cannot be deleted because they have assigned trips.");
         }
-        else
-        {
-            _context.Remove(client);
-            await _context.SaveChangesAsync();
-            return Ok();
-        }
+
+        _context.Clients.Remove(client);
+        await _context.SaveChangesAsync();
+        
+        return Ok();
     }
 
 }

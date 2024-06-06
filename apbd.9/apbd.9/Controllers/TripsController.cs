@@ -1,6 +1,7 @@
 using apbd._9.Data;
 using apbd._9.DTOs;
 using apbd._9.Models;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,4 +48,76 @@ public class TripsController : ControllerBase
         
         return Ok(paginatedTrips);
     }
+
+    [HttpPost("{idTrip}/clients")]
+    public async Task<IActionResult> AssignClientToTrip(int idTrip, AssignClientDTO newClient)
+    {
+        var client = await _context.Clients.SingleOrDefaultAsync(e => e.Pesel == newClient.Pesel);
+        var trip = await _context.Trips.SingleOrDefaultAsync(e => e.IdTrip == idTrip);
+
+        if (trip == null)
+        {
+            if (trip.DateFrom < DateTime.Now)
+            {
+                return BadRequest("Trip with given ID already took place");
+            }
+
+            return NotFound("Trip with given ID doesnt exist");
+        }
+
+        if (client != null)
+        {
+            if (client.ClientTrips.Any(e => e.IdTrip == idTrip))
+            {
+                return BadRequest($"Client with given PESEL is already assigned to this trip");
+            }
+
+            return BadRequest($"Client with the given PESEL already exists");
+        }
+
+        client = new Client()
+        {
+            FirstName = newClient.FirstName,
+            LastName = newClient.LastName,
+            Email = newClient.Email,
+            Pesel = newClient.Pesel,
+            Telephone = newClient.Telephone
+        };
+        
+        client.ClientTrips.Add(new ClientTrip()
+        {
+            IdClient = client.IdClient,
+            IdTrip = idTrip,
+            PaymentDate = newClient.PaymentDate,
+            RegisteredAt = DateTime.Now,
+            IdClientNavigation = client,
+            IdTripNavigation = trip
+        });
+
+        await _context.Clients.AddAsync(client);
+        await _context.SaveChangesAsync();
+        
+        return Ok();
+    }
+    
+    [HttpDelete("{idClient}")]
+    public async Task<IActionResult> DeleteClientWithId(int idClient)
+    {
+        var client = await _context.Clients.SingleOrDefaultAsync(e => e.IdClient == idClient);
+        if (client == null)
+        {
+            return NotFound($"Client with id - {idClient} doesnt exist");
+        }
+        else if (client.ClientTrips.Count == 0)
+        {
+            return BadRequest("Client has assigned trips");
+        }
+        else
+        {
+            _context.Remove(client);
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+    }
+
 }
